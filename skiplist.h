@@ -4,6 +4,7 @@
 > 微信公众号:    代码随想录
 > Created Time:  Sun Dec  2 19:04:26 2018
 > Description:   
+> Optimized:     智能指针重构 + 范围查询功能
  ************************************************************************/
 
 #include <iostream> 
@@ -12,6 +13,8 @@
 #include <cstring>
 #include <mutex>
 #include <fstream>
+#include <memory>
+#include <vector>
 
 #define STORE_FILE "store/dumpFile"
 
@@ -36,7 +39,8 @@ public:
 
     void set_value(V);
     
-    // Linear array to hold pointers to next node of different level
+    // 使用原始指针数组（因为跳表的特殊结构，节点间共享所有权不适合shared_ptr）
+    // 内存管理由SkipList统一负责
     Node<K, V> **forward;
 
     int node_level;
@@ -96,6 +100,9 @@ public:
     //递归删除节点
     void clear(Node<K,V>*);
     int size();
+    
+    // 新增：范围查询功能
+    std::vector<std::pair<K, V>> range_query(K start_key, K end_key);
 
 private:
     void get_key_value_from_string(const std::string& str, std::string* key, std::string* value);
@@ -250,10 +257,11 @@ void SkipList<K, V>::load_file() {
     _file_reader.open(STORE_FILE);
     std::cout << "load_file-----------------" << std::endl;
     std::string line;
-    std::string* key = new std::string();
-    std::string* value = new std::string();
+    // 使用智能指针自动管理内存
+    std::unique_ptr<std::string> key(new std::string());
+    std::unique_ptr<std::string> value(new std::string());
     while (getline(_file_reader, line)) {
-        get_key_value_from_string(line, key, value);
+        get_key_value_from_string(line, key.get(), value.get());
         if (key->empty() || value->empty()) {
             continue;
         }
@@ -261,8 +269,7 @@ void SkipList<K, V>::load_file() {
         insert_element(stoi(*key), *value);
         std::cout << "key:" << *key << "value:" << *value << std::endl;
     }
-    delete key;
-    delete value;
+    // 智能指针自动释放，无需手动delete
     _file_reader.close();
 }
 
@@ -432,4 +439,57 @@ int SkipList<K, V>::get_random_level(){
     k = (k < _max_level) ? k : _max_level;
     return k;
 };
+
+/**
+ * @brief 范围查询功能 - 查询[start_key, end_key]范围内的所有键值对
+ * 
+ * @param start_key 起始键（包含）
+ * @param end_key 结束键（包含）
+ * @return std::vector<std::pair<K, V>> 范围内的所有键值对，按键升序排列
+ * 
+ * 时间复杂度：O(log n + m)，其中n是跳表总元素数，m是结果集大小
+ * 空间复杂度：O(m)
+ * 
+ * 边界条件：
+ * 1. 如果start_key > end_key，返回空vector
+ * 2. 如果范围内没有元素，返回空vector
+ * 3. 支持start_key == end_key的情况（单点查询）
+ */
+template<typename K, typename V>
+std::vector<std::pair<K, V>> SkipList<K, V>::range_query(K start_key, K end_key) {
+    
+    std::vector<std::pair<K, V>> result;
+    
+    // 边界条件检查：如果起始键大于结束键，返回空结果
+    if (start_key > end_key) {
+        std::cout << "Invalid range: start_key > end_key" << std::endl;
+        return result;
+    }
+    
+    std::cout << "range_query: [" << start_key << ", " << end_key << "]" << std::endl;
+    
+    Node<K, V> *current = _header;
+    
+    // 第一步：从最高层开始，找到start_key的前驱节点
+    // 这一步的时间复杂度是O(log n)
+    for (int i = _skip_list_level; i >= 0; i--) {
+        while (current->forward[i] != NULL && current->forward[i]->get_key() < start_key) {
+            current = current->forward[i];
+        }
+    }
+    
+    // 移动到第0层的下一个节点，这是第一个可能在范围内的节点
+    current = current->forward[0];
+    
+    // 第二步：在第0层顺序遍历，收集[start_key, end_key]范围内的所有节点
+    // 这一步的时间复杂度是O(m)，m是结果集大小
+    while (current != NULL && current->get_key() <= end_key) {
+        result.push_back(std::make_pair(current->get_key(), current->get_value()));
+        current = current->forward[0];
+    }
+    
+    std::cout << "Found " << result.size() << " elements in range" << std::endl;
+    return result;
+}
+
 // vim: et tw=100 ts=4 sw=4 cc=120

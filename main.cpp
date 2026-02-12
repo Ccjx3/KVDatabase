@@ -1,10 +1,3 @@
-/* ************************************************************************
-> File Name:     main.cpp
-> Author:        程序员Carl
-> 微信公众号:    代码随想录
-> Created Time:  Sun Dec  2 20:21:41 2018
-> Description:   
- ************************************************************************/
 #include <iostream>
 #include "skiplist.h"
 #define FILE_PATH "./store/dumpFile"
@@ -31,13 +24,54 @@ int main() {
     skipList.search_element(9);
     skipList.search_element(18);
 
-
     skipList.display_list();
 
+    // ========== 测试范围查询功能 ==========
+    std::cout << "\n========== 范围查询测试 ==========" << std::endl;
+    
+    // 测试1：正常范围查询
+    std::cout << "\n测试1：查询范围 [3, 9]" << std::endl;
+    auto result1 = skipList.range_query(3, 9);
+    for (const auto& pair : result1) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+    }
+    
+    // 测试2：查询所有元素
+    std::cout << "\n测试2：查询范围 [1, 20]" << std::endl;
+    auto result2 = skipList.range_query(1, 20);
+    for (const auto& pair : result2) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+    }
+    
+    // 测试3：单点查询（start == end）
+    std::cout << "\n测试3：单点查询 [7, 7]" << std::endl;
+    auto result3 = skipList.range_query(7, 7);
+    for (const auto& pair : result3) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+    }
+    
+    // 测试4：不存在的范围
+    std::cout << "\n测试4：查询不存在的范围 [10, 15]" << std::endl;
+    auto result4 = skipList.range_query(10, 15);
+    std::cout << "结果数量: " << result4.size() << std::endl;
+    
+    // 测试5：无效范围（start > end）
+    std::cout << "\n测试5：无效范围 [15, 10]" << std::endl;
+    auto result5 = skipList.range_query(15, 10);
+    std::cout << "结果数量: " << result5.size() << std::endl;
+
+    std::cout << "\n========== 删除操作测试 ==========" << std::endl;
     skipList.delete_element(3);
     skipList.delete_element(7);
 
     std::cout << "skipList size:" << skipList.size() << std::endl;
 
     skipList.display_list();
+    
+    // 测试6：删除后的范围查询
+    std::cout << "\n测试6：删除后查询范围 [3, 9]" << std::endl;
+    auto result6 = skipList.range_query(3, 9);
+    for (const auto& pair : result6) {
+        std::cout << "Key: " << pair.first << ", Value: " << pair.second << std::endl;
+    }
 }
